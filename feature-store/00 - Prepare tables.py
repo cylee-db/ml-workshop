@@ -52,38 +52,82 @@ spark.sql(f"USE DATABASE {db}")
 
 # COMMAND ----------
 
-features_df = spark.read.table(f"{demo_catalog}.{demo_db}.churn_features").drop("churn")
+import pandas as pd
+
+pdf = pd.read_csv(f"./data/churn_features.csv",
+                  parse_dates=[2, 3, 15, 19])
+
+# Alternatively, upload csv to a Volume in your working schema and read from there
+# pdf = pd.read_csv(f"/Volumes/{catalog}/{db}/wkshp_volume/churn_features.csv",
+#                   parse_dates=[2, 3, 15, 19])
+
+df = spark.createDataFrame(pdf)
+
+display(df)
+
+# COMMAND ----------
+
+features_df = df.drop("churn")
 
 features_df.write.mode("overwrite").saveAsTable(f"{catalog}.{db}.ml_churn_features")
 
 # COMMAND ----------
 
+from pyspark.sql.functions import col
+
+labels_df = df.select("user_id", col('churn').alias("churn_label"))
+
+labels_df.write.mode("overwrite").saveAsTable(f"{catalog}.{db}.ml_churn_labels")
+
+# COMMAND ----------
+
 # MAGIC %sql
-# MAGIC DROP TABLE IF EXISTS ml_churn_labels
+# MAGIC -- Primary key column cannot be null
+# MAGIC ALTER TABLE ml_churn_labels ALTER COLUMN user_id SET NOT NULL
 # MAGIC ;
-# MAGIC CREATE TABLE IF NOT EXISTS ml_churn_labels (
-# MAGIC   user_id STRING,
-# MAGIC   churn_label INT,
-# MAGIC   CONSTRAINT user_pk PRIMARY KEY (user_id)
-# MAGIC )
+# MAGIC -- Set the primary key column
+# MAGIC ALTER TABLE ml_churn_labels ADD CONSTRAINT user_pk PRIMARY KEY(user_id)
 # MAGIC ;
 
 # COMMAND ----------
 
-query = f"""
-  MERGE INTO {catalog}.{db}.ml_churn_labels t USING {demo_catalog}.{demo_db}.churn_features s
-  ON t.user_id = s.user_id
-  WHEN NOT MATCHED THEN
-  INSERT
-    (user_id, churn_label)
-  VALUES(
-      s.user_id,
-      s.churn
-    )
-  ;
-  """
+# MAGIC %md
+# MAGIC ## ALTERNATIVE: Set up from the Lakehouse C360 demo
+
+# COMMAND ----------
+
+# features_df = spark.read.table(f"{demo_catalog}.{demo_db}.churn_features").drop("churn")
+
+# features_df.write.mode("overwrite").saveAsTable(f"{catalog}.{db}.ml_churn_features")
+
+# COMMAND ----------
+
+# %sql
+# DROP TABLE IF EXISTS ml_churn_labels
+# ;
+# CREATE TABLE IF NOT EXISTS ml_churn_labels (
+#   user_id STRING,
+#   churn_label INT,
+#   CONSTRAINT user_pk PRIMARY KEY (user_id)
+# )
+# ;
+
+# COMMAND ----------
+
+# query = f"""
+#   MERGE INTO {catalog}.{db}.ml_churn_labels t USING {demo_catalog}.{demo_db}.churn_features s
+#   ON t.user_id = s.user_id
+#   WHEN NOT MATCHED THEN
+#   INSERT
+#     (user_id, churn_label)
+#   VALUES(
+#       s.user_id,
+#       s.churn
+#     )
+#   ;
+#   """
   
-spark.sql(query)
+# spark.sql(query)
 
 # COMMAND ----------
 

@@ -28,6 +28,10 @@ taxi_df = _sqldf
 
 # COMMAND ----------
 
+display(taxi_df.select("fare_amount"))
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC Convert the Spark Dataframe to a pandas dataframe if it fits into the memory of your VM.
 
